@@ -173,7 +173,7 @@ const HEROES = {
 };
 
 let G = {
-  name: '', hero: 'sword', num: 0, rid: '', hp: 100, hp2: 100,
+  name: '', hero: 'sword', hero2: 'sword', num: 0, rid: '', hp: 100, hp2: 100,
   x: 150, x2: 750, y: 300, y2: 300, vy: 0, jump: false,
   skillcd: 0, skillcd2: 0, active: false, oppname: '对手',
   effects: [], keys: {}, sync: null
@@ -220,6 +220,7 @@ async function joinGame() {
       G.rid = q[0].rid;
       G.num = 2;
       G.oppname = q[0].name;
+      G.hero2 = q[0].hero;
       
       const h = HEROES[G.hero];
       await db.ref('r/' + G.rid).update({
@@ -238,13 +239,14 @@ async function joinGame() {
         p2: null
       });
       
-      await db.ref('q').set([...q, { rid: G.rid, name: G.name }]);
+      await db.ref('q').set([...q, { rid: G.rid, name: G.name, hero: G.hero }]);
       
       const tmr = setInterval(() => {
         db.ref('r/' + G.rid).once('value', s => {
           if (s.val() && s.val().p2) {
             clearInterval(tmr);
             G.oppname = s.val().p2.n;
+            G.hero2 = s.val().p2.h;
             setTimeout(() => startGame(), 500);
           }
         });
@@ -272,14 +274,15 @@ function startGame() {
   G.active = true;
   
   const h = HEROES[G.hero];
+  const h2 = HEROES[G.hero2];
   G.hp = h.hp;
-  G.hp2 = h.hp;
+  G.hp2 = h2.hp;
   
   const p1 = G.num === 1 ? G.name : G.oppname;
   const p2 = G.num === 1 ? G.oppname : G.name;
   
   el('player1Name').textContent = p1 + ' ' + h.name;
-  el('player2Name').textContent = p2 + ' ' + h.name;
+  el('player2Name').textContent = p2 + ' ' + h2.name;
   
   document.onkeydown = e => {
     G.keys[e.key] = true;
@@ -297,6 +300,7 @@ function startGame() {
       if (s.val()) {
         const d = G.num === 1 ? s.val().p2 : s.val().p1;
         if (d) {
+          G.hero2 = d.h;
           G.hp2 = d.hp;
           G.x2 = d.x;
           G.y2 = d.y;
@@ -364,8 +368,9 @@ function loop() {
 
 function upUI() {
   const h = HEROES[G.hero];
+  const h2 = HEROES[G.hero2];
   el('health1').style.width = Math.max(0, G.hp / h.hp * 100) + '%';
-  el('health2').style.width = Math.max(0, G.hp2 / h.hp * 100) + '%';
+  el('health2').style.width = Math.max(0, G.hp2 / h2.hp * 100) + '%';
   el('hp1').textContent = Math.max(0, Math.floor(G.hp));
   el('hp2').textContent = Math.max(0, Math.floor(G.hp2));
   
@@ -396,7 +401,7 @@ function draw() {
   ctx.setLineDash([]);
   
   dchr(G.x, G.y, G.hero, '#3498db');
-  dchr(G.x2, G.y2, G.hero, '#e74c3c');
+  dchr(G.x2, G.y2, G.hero2, '#e74c3c');
   
   G.effects.forEach(e => {
     ctx.font = 'bold 40px Arial';
