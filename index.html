@@ -289,24 +289,63 @@ async function joinGame() {
   show('waiting');
   
   try {
-    // 尝试从��列中找到对手
     const queueRef = db.ref('matchmaking/queue');
-    await queueRef.transaction(queue => {
-      if (!queue) queue = [];
+    const snapshot = await queueRef.once('value');
+    const queue = snapshot.val() || [];
+    
+    console.log('当前队列:', queue);
+    
+    if (queue.length > 0) {
+      // 有人等待，加入对战
+      gameState.roomId = queue[0].roomId;
+      gameState.playerNumber = 2;
+      gameState.opponentName = queue[0].name;
       
-      if (queue.length > 0) {
-        // 有人等待，加入对战
-        gameState.roomId = queue[0].roomId;
-        gameState.playerNumber = 2;
-        queue.shift();
-        return queue;
-      } else {
-        // 没人等待，创建房间
-        gameState.roomId = genRoomId();
-        gameState.playerNumber = 1;
-        return [...queue, { roomId: gameState.roomId, name: gameState.playerName }];
-      }
-    });
+      // 更新房间，添加第二��玩家
+      const myHero = HEROES[gameState.selectedHero];
+      await db.ref('rooms/' + gameState.roomId).update({
+        player2: {
+          name: gameState.playerName,
+          hero: gameState.selectedHero,
+          hp: myHero.hp
+        },
+        ready: true
+      });
+      
+      // 从队列移除
+      await queueRef.set(queue.slice(1));
+      
+      console.log('加入房间:', gameState.roomId);
+      setTimeout(startGame, 800);
+    } else {
+      // 没人等待，创建房间
+      gameState.roomId = genRoomId();
+      gameState.playerNumber = 1;
+      
+      const myHero = HEROES[gameState.selectedHero];
+      await db.ref('rooms/' + gameState.roomId).set({
+        roomId: gameState.roomId,
+        player1: {
+          name: gameState.playerName,
+          hero: gameState.selectedHero,
+          hp: myHero.hp
+        },
+        player2: null,
+        ready: false,
+        createdAt: Date.now()
+      });
+      
+      // 加入队列
+      await queueRef.set([...queue, { roomId: gameState.roomId, name: gameState.playerName }]);
+      
+      console.log('创建房间:', gameState.roomId);
+      waitForPlayer2();
+    }
+  } catch (error) {
+    console.error('配对错误:', error);
+    alert('连接出错，请重试: ' + error.message);
+    show('lobby');
+  }
     
     if (gameState.playerNumber === 1) {
       // 第一个玩家，等待第二个玩家
