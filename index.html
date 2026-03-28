@@ -57,7 +57,7 @@ function join(){
     db.ref('queue').set([]);
     start();
   }else{
-    G.rid='r'+Math.random();
+    G.rid='room_' + Math.floor(Math.random() * 1000000);  // 修改房间ID生成方式
     G.num=1;
     db.ref('rooms/'+G.rid).set({p1:{x:150,y:300}});
     db.ref('queue').set([{rid:G.rid}]);
